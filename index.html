@@ -83,39 +83,59 @@ input[type="text"] {
   background: #fff;
 }
 
-.upload {
-  border: 1px dashed #d7cbc1;
+.upload-box {
+  width: 100%;
+  min-height: 125px;
+  padding: 18px 12px;
+  border: 1.5px dashed #d7cbc1;
   border-radius: 13px;
   background: #fff;
-  padding: 20px;
-  text-align: center;
   margin-top: 22px;
+  text-align: center;
   cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
 }
 
-.upload input {
+.upload-box:hover {
+  border-color: #f04b2f;
+  background: #fffaf8;
+}
+
+.upload-box input {
   display: none;
 }
 
-.upload strong {
-  display: block;
+.upload-plus {
   color: #f04b2f;
-  font-size: 28px;
-  margin-bottom: 5px;
+  font-size: 34px;
+  line-height: 1;
+  margin-bottom: 8px;
 }
 
-.upload small {
-  display: block;
+.upload-title {
+  color: #333;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.upload-tip {
   color: #999;
-  margin-top: 5px;
   font-size: 11px;
+  margin-top: 5px;
 }
 
 .file-name {
+  width: 100%;
   color: #f04b2f;
   font-size: 11px;
   margin-top: 8px;
-  word-break: break-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 input[type="range"] {
@@ -240,19 +260,19 @@ canvas {
       上傳 PNG 商品圖片，修改文字後下載 JPG 圖片。
     </p>
 
-    <label class="upload">
-      <strong>＋</strong>
-      上傳 PNG 商品圖片
-      <small>建議使用透明背景 PNG</small>
-
+    <div class="upload-box" id="uploadBox">
       <input
         id="productFile"
         type="file"
         accept="image/png"
       >
 
+      <div class="upload-plus">＋</div>
+      <div class="upload-title">上傳 PNG 商品圖片</div>
+      <div class="upload-tip">建議使用透明背景 PNG</div>
+
       <div id="fileName" class="file-name"></div>
-    </label>
+    </div>
 
     <div class="section">
       <h2>文字內容</h2>
@@ -369,7 +389,6 @@ const backgroundImage = new Image();
 const productImage = new Image();
 
 let productLoaded = false;
-
 let scale = 1;
 
 let position = {
@@ -387,13 +406,16 @@ backgroundImage.onload = () => {
 };
 
 function drawBackground() {
-  if (backgroundImage.complete && backgroundImage.naturalWidth > 0) {
+  if (
+    backgroundImage.complete &&
+    backgroundImage.naturalWidth > 0
+  ) {
     ctx.drawImage(
       backgroundImage,
       0,
       0,
-      canvas.width,
-      canvas.height
+      1080,
+      1350
     );
   } else {
     ctx.fillStyle = "#f34b2e";
@@ -432,12 +454,7 @@ function drawProduct() {
   ctx.restore();
 }
 
-function render() {
-  ctx.clearRect(0, 0, 1080, 1350);
-
-  drawBackground();
-  drawProduct();
-
+function drawText() {
   ctx.textAlign = "center";
 
   ctx.fillStyle = "#3d3d3d";
@@ -475,8 +492,16 @@ function render() {
   ctx.textAlign = "start";
 }
 
-$("productFile").addEventListener("change", event => {
-  const file = event.target.files[0];
+function render() {
+  ctx.clearRect(0, 0, 1080, 1350);
+
+  drawBackground();
+  drawProduct();
+  drawText();
+}
+
+function loadProductImage() {
+  const file = $("productFile").files[0];
 
   if (!file) return;
 
@@ -484,6 +509,7 @@ $("productFile").addEventListener("change", event => {
 
   productImage.onload = () => {
     productLoaded = true;
+
     position = {
       x: 540,
       y: 680
@@ -497,7 +523,16 @@ $("productFile").addEventListener("change", event => {
   };
 
   productImage.src = url;
+}
+
+$("uploadBox").addEventListener("click", () => {
+  $("productFile").click();
 });
+
+$("productFile").addEventListener(
+  "change",
+  loadProductImage
+);
 
 [
   "headline",
@@ -549,6 +584,10 @@ canvas.addEventListener("pointerup", () => {
   dragging = false;
 });
 
+canvas.addEventListener("pointercancel", () => {
+  dragging = false;
+});
+
 $("reset").addEventListener("click", () => {
   scale = 1;
 
@@ -566,7 +605,10 @@ $("reset").addEventListener("click", () => {
 $("download").addEventListener("click", () => {
   const link = document.createElement("a");
 
-  link.download = "強品圖片-" + Date.now() + ".jpg";
+  link.download =
+    "強品圖片-" +
+    Date.now() +
+    ".jpg";
 
   link.href = canvas.toDataURL(
     "image/jpeg",
