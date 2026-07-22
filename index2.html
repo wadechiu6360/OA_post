@@ -1,0 +1,762 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>強品圖片製作器</title>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #f2efeb;
+  color: #3d3d3d;
+  font-family:
+    "Noto Sans CJK TC",
+    "Noto Sans TC",
+    "Microsoft JhengHei",
+    sans-serif;
+}
+
+.app {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 330px 1fr;
+}
+
+.sidebar {
+  padding: 28px 24px;
+  background: #fffdfb;
+  border-right: 1px solid #e7dfd8;
+}
+
+.logo {
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: 30px;
+}
+
+h1 {
+  font-size: 26px;
+  line-height: 1.35;
+  margin: 8px 0 12px;
+}
+
+.intro {
+  color: #777;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.section {
+  border-top: 1px solid #e7dfd8;
+  margin-top: 22px;
+  padding-top: 18px;
+}
+
+.section h2 {
+  font-size: 12px;
+  letter-spacing: .12em;
+  margin: 0 0 13px;
+}
+
+.field {
+  margin: 12px 0;
+}
+
+.field label {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+input[type="text"],
+select {
+  width: 100%;
+  height: 40px;
+  border: 1px solid #ded6ce;
+  border-radius: 8px;
+  padding: 0 10px;
+  font: inherit;
+  background: #fff;
+}
+
+.upload-box {
+  width: 100%;
+  min-height: 125px;
+  padding: 18px 12px;
+  border: 1.5px dashed #d7cbc1;
+  border-radius: 13px;
+  background: #fff;
+  margin-top: 22px;
+  text-align: center;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.upload-box:hover {
+  border-color: #f04b2f;
+  background: #fffaf8;
+}
+
+.upload-box input {
+  display: none;
+}
+
+.upload-plus {
+  color: #f04b2f;
+  font-size: 34px;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.upload-title {
+  color: #333;
+  font-size: 14px;
+}
+
+.upload-tip {
+  color: #999;
+  font-size: 11px;
+  margin-top: 5px;
+}
+
+.file-name {
+  width: 100%;
+  color: #f04b2f;
+  font-size: 11px;
+  margin-top: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: #f04b2f;
+}
+
+.hint {
+  color: #999;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+button {
+  border: 0;
+  border-radius: 9px;
+  height: 43px;
+  padding: 0 15px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.reset {
+  background: #eee8e2;
+}
+
+.download {
+  flex: 1;
+  background: #222;
+  color: white;
+}
+
+.main {
+  padding: 38px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.preview {
+  width: min(100%, 720px);
+}
+
+.preview-title {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.preview-title span {
+  color: #999;
+  font-size: 11px;
+}
+
+.card {
+  padding: 18px;
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 18px 50px #62472b18;
+}
+
+.canvas-wrap {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+.note {
+  margin-top: 10px;
+  color: #999;
+  font-size: 11px;
+  text-align: right;
+}
+
+@media (max-width: 800px) {
+  .app {
+    display: block;
+  }
+
+  .sidebar {
+    border-right: 0;
+    border-bottom: 1px solid #e7dfd8;
+  }
+
+  .main {
+    padding: 20px 12px 35px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="app">
+
+  <aside class="sidebar">
+
+    <div class="logo">
+      強品圖片製作器
+    </div>
+
+    <h1>
+      上傳圖片，<br>
+      改字就能出圖。
+    </h1>
+
+    <p class="intro">
+      選擇版型、上傳圖片，修改文字後下載 JPG 圖片。
+    </p>
+
+    <div class="section">
+      <h2>版型選擇</h2>
+
+      <select id="mode">
+        <option value="product">純商品版</option>
+        <option value="scene">情境圖版</option>
+      </select>
+    </div>
+
+    <div
+      class="upload-box"
+      id="uploadBox"
+    >
+      <input
+        id="imageFile"
+        type="file"
+        accept="image/png,image/jpeg"
+      >
+
+      <div class="upload-plus">＋</div>
+
+      <div
+        class="upload-title"
+        id="uploadTitle"
+      >
+        上傳 PNG 商品圖片
+      </div>
+
+      <div
+        class="upload-tip"
+        id="uploadTip"
+      >
+        建議使用透明背景 PNG
+      </div>
+
+      <div
+        id="fileName"
+        class="file-name"
+      ></div>
+    </div>
+
+    <div class="section">
+      <h2>文字內容</h2>
+
+      <div class="field">
+        <label>主標題</label>
+        <input
+          id="headline"
+          type="text"
+          value="運動男女必收好物！"
+        >
+      </div>
+
+      <div class="field">
+        <label>品牌／商品名</label>
+        <input
+          id="brand"
+          type="text"
+          value="DR.WU"
+        >
+      </div>
+
+      <div class="field">
+        <label>開賣時間</label>
+        <input
+          id="date"
+          type="text"
+          value="7/25 00:00 限量開搶"
+        >
+      </div>
+
+      <div class="field">
+        <label>底部描述</label>
+        <input
+          id="description"
+          type="text"
+          value="輕透水感物理防曬液"
+        >
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>圖片調整</h2>
+
+      <label>
+        圖片大小　
+        <span id="zoomText">100%</span>
+      </label>
+
+      <input
+        id="zoom"
+        type="range"
+        min="50"
+        max="160"
+        value="100"
+      >
+
+      <p class="hint">
+        可直接在右側預覽圖上拖曳圖片位置。
+      </p>
+    </div>
+
+    <div class="buttons">
+      <button
+        class="reset"
+        id="reset"
+      >
+        重設
+      </button>
+
+      <button
+        class="download"
+        id="download"
+      >
+        下載 JPG ↓
+      </button>
+    </div>
+
+  </aside>
+
+  <main class="main">
+
+    <div class="preview">
+
+      <div class="preview-title">
+        <b>即時預覽</b>
+        <span>1080 × 1350 px · JPG</span>
+      </div>
+
+      <div class="card">
+
+        <div class="canvas-wrap">
+          <canvas
+            id="canvas"
+            width="1080"
+            height="1350"
+          ></canvas>
+        </div>
+
+        <div class="note">
+          拖曳圖片調整位置
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+const canvas = $("canvas");
+const ctx = canvas.getContext("2d");
+
+const FONT =
+  '"Noto Sans CJK TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif';
+
+const productBackground = new Image();
+const sceneBackground = new Image();
+const uploadedImage = new Image();
+
+productBackground.src = "background.png";
+sceneBackground.src = "background2.png";
+
+let imageLoaded = false;
+let scale = 1;
+
+let position = {
+  x: 540,
+  y: 680
+};
+
+let dragging = false;
+let lastPoint = null;
+
+function currentBackground() {
+  if ($("mode").value === "scene") {
+    return sceneBackground;
+  }
+
+  return productBackground;
+}
+
+function drawBackground() {
+  const background = currentBackground();
+
+  if (
+    background.complete &&
+    background.naturalWidth > 0
+  ) {
+    ctx.drawImage(
+      background,
+      0,
+      0,
+      1080,
+      1350
+    );
+  } else {
+    ctx.fillStyle = "#f34b2e";
+    ctx.fillRect(0, 0, 1080, 1350);
+  }
+}
+
+function drawProductImage() {
+  if (!imageLoaded) return;
+
+  const maxWidth = 650;
+  const maxHeight = 650;
+
+  const ratio =
+    Math.min(
+      maxWidth / uploadedImage.width,
+      maxHeight / uploadedImage.height
+    ) * scale;
+
+  const width = uploadedImage.width * ratio;
+  const height = uploadedImage.height * ratio;
+
+  ctx.save();
+
+  ctx.shadowColor = "#0004";
+  ctx.shadowBlur = 28;
+  ctx.shadowOffsetY = 15;
+
+  ctx.drawImage(
+    uploadedImage,
+    position.x - width / 2,
+    position.y - height / 2,
+    width,
+    height
+  );
+
+  ctx.restore();
+}
+
+function drawSceneImage() {
+  if (!imageLoaded) return;
+
+  /*
+    background2.png 的黑色內框位置：
+    x: 290
+    y: 425
+    width: 500
+    height: 500
+  */
+
+  const box = {
+    x: 290,
+    y: 425,
+    width: 500,
+    height: 500
+  };
+
+  const ratio =
+    Math.max(
+      box.width / uploadedImage.width,
+      box.height / uploadedImage.height
+    ) * scale;
+
+  const width = uploadedImage.width * ratio;
+  const height = uploadedImage.height * ratio;
+
+  ctx.save();
+
+  // 只允許圖片出現在黑色內框
+  ctx.beginPath();
+  ctx.rect(
+    box.x,
+    box.y,
+    box.width,
+    box.height
+  );
+  ctx.clip();
+
+  ctx.drawImage(
+    uploadedImage,
+    position.x - width / 2,
+    position.y - height / 2,
+    width,
+    height
+  );
+
+  ctx.restore();
+}
+
+function drawTexts() {
+  ctx.textAlign = "center";
+
+  ctx.fillStyle = "#3d3d3d";
+  ctx.font = `800 58px ${FONT}`;
+  ctx.fillText(
+    $("headline").value,
+    540,
+    168
+  );
+
+  ctx.fillStyle = "#ce3634";
+  ctx.font = `800 70px ${FONT}`;
+  ctx.fillText(
+    $("brand").value,
+    540,
+    258
+  );
+
+  ctx.fillStyle = "#080808";
+  ctx.font = `700 46px ${FONT}`;
+  ctx.fillText(
+    $("date").value,
+    540,
+    330
+  );
+
+  ctx.fillStyle = "#777";
+  ctx.font = `800 48px ${FONT}`;
+  ctx.fillText(
+    $("description").value,
+    540,
+    1065
+  );
+
+  ctx.textAlign = "start";
+}
+
+function render() {
+  ctx.clearRect(
+    0,
+    0,
+    1080,
+    1350
+  );
+
+  drawBackground();
+
+  if ($("mode").value === "scene") {
+    drawSceneImage();
+  } else {
+    drawProductImage();
+  }
+
+  drawTexts();
+}
+
+function loadImage() {
+  const file = $("imageFile").files[0];
+
+  if (!file) return;
+
+  const url = URL.createObjectURL(file);
+
+  uploadedImage.onload = () => {
+    imageLoaded = true;
+
+    position = {
+      x: 540,
+      y: $("mode").value === "scene"
+        ? 675
+        : 680
+    };
+
+    $("fileName").textContent = file.name;
+
+    render();
+
+    URL.revokeObjectURL(url);
+  };
+
+  uploadedImage.src = url;
+}
+
+$("uploadBox").addEventListener("click", () => {
+  $("imageFile").click();
+});
+
+$("imageFile").addEventListener(
+  "change",
+  loadImage
+);
+
+$("mode").addEventListener("change", () => {
+  const sceneMode = $("mode").value === "scene";
+
+  $("uploadTitle").textContent = sceneMode
+    ? "上傳 JPG／PNG 情境圖片"
+    : "上傳 PNG 商品圖片";
+
+  $("uploadTip").textContent = sceneMode
+    ? "圖片會填入拍立得內框"
+    : "建議使用透明背景 PNG";
+
+  position = {
+    x: 540,
+    y: sceneMode ? 675 : 680
+  };
+
+  render();
+});
+
+[
+  "headline",
+  "brand",
+  "date",
+  "description"
+].forEach(id => {
+  $(id).addEventListener("input", render);
+});
+
+$("zoom").addEventListener("input", event => {
+  scale = Number(event.target.value) / 100;
+
+  $("zoomText").textContent =
+    event.target.value + "%";
+
+  render();
+});
+
+function getCanvasPoint(event) {
+  const rect = canvas.getBoundingClientRect();
+
+  return {
+    x: (event.clientX - rect.left) *
+      1080 / rect.width,
+
+    y: (event.clientY - rect.top) *
+      1350 / rect.height
+  };
+}
+
+canvas.addEventListener("pointerdown", event => {
+  if (!imageLoaded) return;
+
+  dragging = true;
+  lastPoint = getCanvasPoint(event);
+
+  canvas.setPointerCapture(event.pointerId);
+});
+
+canvas.addEventListener("pointermove", event => {
+  if (!dragging) return;
+
+  const point = getCanvasPoint(event);
+
+  position.x += point.x - lastPoint.x;
+  position.y += point.y - lastPoint.y;
+
+  lastPoint = point;
+
+  render();
+});
+
+canvas.addEventListener("pointerup", () => {
+  dragging = false;
+});
+
+canvas.addEventListener("pointercancel", () => {
+  dragging = false;
+});
+
+$("reset").addEventListener("click", () => {
+  scale = 1;
+
+  position = {
+    x: 540,
+    y: $("mode").value === "scene"
+      ? 675
+      : 680
+  };
+
+  $("zoom").value = 100;
+  $("zoomText").textContent = "100%";
+
+  render();
+});
+
+$("download").addEventListener("click", () => {
+  const link = document.createElement("a");
+
+  link.download =
+    "強品圖片-" +
+    Date.now() +
+    ".jpg";
+
+  link.href = canvas.toDataURL(
+    "image/jpeg",
+    0.92
+  );
+
+  link.click();
+});
+
+productBackground.onload = render;
+sceneBackground.onload = render;
+
+render();
+</script>
+
+</body>
+</html>
