@@ -68,12 +68,13 @@ h1 {
 }
 
 .field label {
-  font-size: 12px;
   display: block;
+  font-size: 12px;
   margin-bottom: 6px;
 }
 
-input[type="text"] {
+input[type="text"],
+select {
   width: 100%;
   height: 40px;
   border: 1px solid #ded6ce;
@@ -119,7 +120,6 @@ input[type="text"] {
 .upload-title {
   color: #333;
   font-size: 14px;
-  line-height: 1.5;
 }
 
 .upload-tip {
@@ -171,7 +171,7 @@ button {
 .download {
   flex: 1;
   background: #222;
-  color: #fff;
+  color: white;
 }
 
 .main {
@@ -198,7 +198,7 @@ button {
 
 .card {
   padding: 18px;
-  background: #fff;
+  background: white;
   border-radius: 20px;
   box-shadow: 0 18px 50px #62472b18;
 }
@@ -257,21 +257,48 @@ canvas {
     </h1>
 
     <p class="intro">
-      上傳 PNG 商品圖片，修改文字後下載 JPG 圖片。
+      選擇版型、上傳圖片，修改文字後下載 JPG 圖片。
     </p>
 
-    <div class="upload-box" id="uploadBox">
+    <div class="section">
+      <h2>版型選擇</h2>
+
+      <select id="mode">
+        <option value="product">純商品版</option>
+        <option value="scene">情境圖版</option>
+      </select>
+    </div>
+
+    <div
+      class="upload-box"
+      id="uploadBox"
+    >
       <input
-        id="productFile"
+        id="imageFile"
         type="file"
-        accept="image/png"
+        accept="image/png,image/jpeg"
       >
 
       <div class="upload-plus">＋</div>
-      <div class="upload-title">上傳 PNG 商品圖片</div>
-      <div class="upload-tip">建議使用透明背景 PNG</div>
 
-      <div id="fileName" class="file-name"></div>
+      <div
+        class="upload-title"
+        id="uploadTitle"
+      >
+        上傳 PNG 商品圖片
+      </div>
+
+      <div
+        class="upload-tip"
+        id="uploadTip"
+      >
+        建議使用透明背景 PNG
+      </div>
+
+      <div
+        id="fileName"
+        class="file-name"
+      ></div>
     </div>
 
     <div class="section">
@@ -331,16 +358,22 @@ canvas {
       >
 
       <p class="hint">
-        可直接在右側預覽圖上拖曳商品圖片。
+        可直接在右側預覽圖上拖曳圖片位置。
       </p>
     </div>
 
     <div class="buttons">
-      <button class="reset" id="reset">
+      <button
+        class="reset"
+        id="reset"
+      >
         重設
       </button>
 
-      <button class="download" id="download">
+      <button
+        class="download"
+        id="download"
+      >
         下載 JPG ↓
       </button>
     </div>
@@ -357,6 +390,7 @@ canvas {
       </div>
 
       <div class="card">
+
         <div class="canvas-wrap">
           <canvas
             id="canvas"
@@ -366,8 +400,9 @@ canvas {
         </div>
 
         <div class="note">
-          拖曳商品圖片調整位置
+          拖曳圖片調整位置
         </div>
+
       </div>
 
     </div>
@@ -385,10 +420,14 @@ const ctx = canvas.getContext("2d");
 const FONT =
   '"Noto Sans CJK TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif';
 
-const backgroundImage = new Image();
-const productImage = new Image();
+const productBackground = new Image();
+const sceneBackground = new Image();
+const uploadedImage = new Image();
 
-let productLoaded = false;
+productBackground.src = "background.png";
+sceneBackground.src = "background2.png";
+
+let imageLoaded = false;
 let scale = 1;
 
 let position = {
@@ -399,19 +438,23 @@ let position = {
 let dragging = false;
 let lastPoint = null;
 
-backgroundImage.src = "background.png";
+function currentBackground() {
+  if ($("mode").value === "scene") {
+    return sceneBackground;
+  }
 
-backgroundImage.onload = () => {
-  render();
-};
+  return productBackground;
+}
 
 function drawBackground() {
+  const background = currentBackground();
+
   if (
-    backgroundImage.complete &&
-    backgroundImage.naturalWidth > 0
+    background.complete &&
+    background.naturalWidth > 0
   ) {
     ctx.drawImage(
-      backgroundImage,
+      background,
       0,
       0,
       1080,
@@ -423,19 +466,20 @@ function drawBackground() {
   }
 }
 
-function drawProduct() {
-  if (!productLoaded) return;
+function drawProductImage() {
+  if (!imageLoaded) return;
 
-  const maxSize = 620;
+  const maxWidth = 650;
+  const maxHeight = 650;
 
   const ratio =
     Math.min(
-      maxSize / productImage.width,
-      maxSize / productImage.height
+      maxWidth / uploadedImage.width,
+      maxHeight / uploadedImage.height
     ) * scale;
 
-  const width = productImage.width * ratio;
-  const height = productImage.height * ratio;
+  const width = uploadedImage.width * ratio;
+  const height = uploadedImage.height * ratio;
 
   ctx.save();
 
@@ -444,7 +488,7 @@ function drawProduct() {
   ctx.shadowOffsetY = 15;
 
   ctx.drawImage(
-    productImage,
+    uploadedImage,
     position.x - width / 2,
     position.y - height / 2,
     width,
@@ -454,7 +498,57 @@ function drawProduct() {
   ctx.restore();
 }
 
-function drawText() {
+function drawSceneImage() {
+  if (!imageLoaded) return;
+
+  /*
+    background2.png 的黑色內框位置：
+    x: 290
+    y: 425
+    width: 500
+    height: 500
+  */
+
+  const box = {
+    x: 290,
+    y: 425,
+    width: 500,
+    height: 500
+  };
+
+  const ratio =
+    Math.max(
+      box.width / uploadedImage.width,
+      box.height / uploadedImage.height
+    ) * scale;
+
+  const width = uploadedImage.width * ratio;
+  const height = uploadedImage.height * ratio;
+
+  ctx.save();
+
+  // 只允許圖片出現在黑色內框
+  ctx.beginPath();
+  ctx.rect(
+    box.x,
+    box.y,
+    box.width,
+    box.height
+  );
+  ctx.clip();
+
+  ctx.drawImage(
+    uploadedImage,
+    position.x - width / 2,
+    position.y - height / 2,
+    width,
+    height
+  );
+
+  ctx.restore();
+}
+
+function drawTexts() {
   ctx.textAlign = "center";
 
   ctx.fillStyle = "#3d3d3d";
@@ -493,26 +587,39 @@ function drawText() {
 }
 
 function render() {
-  ctx.clearRect(0, 0, 1080, 1350);
+  ctx.clearRect(
+    0,
+    0,
+    1080,
+    1350
+  );
 
   drawBackground();
-  drawProduct();
-  drawText();
+
+  if ($("mode").value === "scene") {
+    drawSceneImage();
+  } else {
+    drawProductImage();
+  }
+
+  drawTexts();
 }
 
-function loadProductImage() {
-  const file = $("productFile").files[0];
+function loadImage() {
+  const file = $("imageFile").files[0];
 
   if (!file) return;
 
   const url = URL.createObjectURL(file);
 
-  productImage.onload = () => {
-    productLoaded = true;
+  uploadedImage.onload = () => {
+    imageLoaded = true;
 
     position = {
       x: 540,
-      y: 680
+      y: $("mode").value === "scene"
+        ? 675
+        : 680
     };
 
     $("fileName").textContent = file.name;
@@ -522,17 +629,36 @@ function loadProductImage() {
     URL.revokeObjectURL(url);
   };
 
-  productImage.src = url;
+  uploadedImage.src = url;
 }
 
 $("uploadBox").addEventListener("click", () => {
-  $("productFile").click();
+  $("imageFile").click();
 });
 
-$("productFile").addEventListener(
+$("imageFile").addEventListener(
   "change",
-  loadProductImage
+  loadImage
 );
+
+$("mode").addEventListener("change", () => {
+  const sceneMode = $("mode").value === "scene";
+
+  $("uploadTitle").textContent = sceneMode
+    ? "上傳 JPG／PNG 情境圖片"
+    : "上傳 PNG 商品圖片";
+
+  $("uploadTip").textContent = sceneMode
+    ? "圖片會填入拍立得內框"
+    : "建議使用透明背景 PNG";
+
+  position = {
+    x: 540,
+    y: sceneMode ? 675 : 680
+  };
+
+  render();
+});
 
 [
   "headline",
@@ -545,7 +671,10 @@ $("productFile").addEventListener(
 
 $("zoom").addEventListener("input", event => {
   scale = Number(event.target.value) / 100;
-  $("zoomText").textContent = event.target.value + "%";
+
+  $("zoomText").textContent =
+    event.target.value + "%";
+
   render();
 });
 
@@ -553,13 +682,16 @@ function getCanvasPoint(event) {
   const rect = canvas.getBoundingClientRect();
 
   return {
-    x: (event.clientX - rect.left) * 1080 / rect.width,
-    y: (event.clientY - rect.top) * 1350 / rect.height
+    x: (event.clientX - rect.left) *
+      1080 / rect.width,
+
+    y: (event.clientY - rect.top) *
+      1350 / rect.height
   };
 }
 
 canvas.addEventListener("pointerdown", event => {
-  if (!productLoaded) return;
+  if (!imageLoaded) return;
 
   dragging = true;
   lastPoint = getCanvasPoint(event);
@@ -593,7 +725,9 @@ $("reset").addEventListener("click", () => {
 
   position = {
     x: 540,
-    y: 680
+    y: $("mode").value === "scene"
+      ? 675
+      : 680
   };
 
   $("zoom").value = 100;
@@ -617,6 +751,9 @@ $("download").addEventListener("click", () => {
 
   link.click();
 });
+
+productBackground.onload = render;
+sceneBackground.onload = render;
 
 render();
 </script>
