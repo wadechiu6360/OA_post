@@ -1,0 +1,999 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>強品批次製圖工具</title>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #f3f0ec;
+  color: #333;
+  font-family:
+    "Noto Sans CJK TC",
+    "Noto Sans TC",
+    "Microsoft JhengHei",
+    sans-serif;
+}
+
+header {
+  padding: 28px 7%;
+  background: #fff;
+  border-bottom: 1px solid #e5ddd5;
+}
+
+header h1 {
+  margin: 0 0 8px;
+  font-size: 25px;
+}
+
+header p {
+  margin: 0;
+  color: #888;
+  font-size: 13px;
+}
+
+.toolbar {
+  padding: 20px 7%;
+  background: #fffaf7;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.excel-upload {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 190px;
+  height: 42px;
+  padding: 0 16px;
+  border-radius: 8px;
+  background: #222;
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.excel-upload input {
+  display: none;
+}
+
+button {
+  height: 42px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 16px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.secondary {
+  background: #eee7e0;
+}
+
+.status {
+  width: 100%;
+  color: #888;
+  font-size: 12px;
+}
+
+.container {
+  width: min(1280px, 94%);
+  margin: 28px auto 60px;
+}
+
+.empty {
+  padding: 70px 20px;
+  border: 1px dashed #d7cbc1;
+  border-radius: 15px;
+  background: #fff;
+  text-align: center;
+  color: #999;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 20px;
+}
+
+.item {
+  padding: 15px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 8px 28px #65472b12;
+}
+
+.item-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.item-number {
+  color: #f04b2f;
+  font-weight: bold;
+}
+
+.canvas-wrap {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #eee;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+select,
+.item input[type="text"] {
+  width: 100%;
+  height: 36px;
+  margin-top: 8px;
+  border: 1px solid #ded5cd;
+  border-radius: 7px;
+  padding: 0 9px;
+  font: inherit;
+  background: #fff;
+}
+
+.upload-image {
+  display: block;
+  margin-top: 10px;
+  padding: 11px;
+  border: 1px dashed #d7cbc1;
+  border-radius: 8px;
+  color: #777;
+  text-align: center;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.upload-image input {
+  display: none;
+}
+
+.file-name {
+  margin-top: 5px;
+  color: #f04b2f;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.zoom-area {
+  margin-top: 10px;
+  color: #888;
+  font-size: 11px;
+}
+
+.zoom-area input {
+  width: 100%;
+  accent-color: #f04b2f;
+}
+
+.controls {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.controls button {
+  flex: 1;
+  height: 38px;
+  font-size: 12px;
+}
+
+.download-one {
+  background: #222;
+  color: #fff;
+}
+
+@media (max-width: 650px) {
+  .toolbar {
+    padding: 18px 4%;
+  }
+
+  .container {
+    width: 94%;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>強品批次製圖工具</h1>
+  <p>
+    上傳 Excel 後，每筆資料可個別選擇版型與圖片。
+  </p>
+</header>
+
+<section class="toolbar">
+
+  <label class="excel-upload">
+    上傳 Excel 檔案
+    <input
+      id="excelFile"
+      type="file"
+      accept=".xlsx,.xls,.csv"
+    >
+  </label>
+
+  <button
+    id="clearAll"
+    class="secondary"
+  >
+    清除全部
+  </button>
+
+  <div
+    id="status"
+    class="status"
+  >
+    Excel 欄位必須包含：宣傳主題、品牌名稱、案型、商品名稱
+  </div>
+
+</section>
+
+<main class="container">
+
+  <div
+    id="empty"
+    class="empty"
+  >
+    請先上傳 Excel 檔案
+  </div>
+
+  <div
+    id="grid"
+    class="grid"
+  ></div>
+
+</main>
+
+<script>
+const FONT =
+  '"Noto Sans CJK TC","Noto Sans TC","Microsoft JhengHei",sans-serif';
+
+const rows = [];
+
+const backgrounds = {
+  product: new Image(),
+  scene: new Image()
+};
+
+backgrounds.product.src = "background.png";
+backgrounds.scene.src = "background2.png";
+
+const $ = id => document.getElementById(id);
+
+function setStatus(message) {
+  $("status").textContent = message;
+}
+
+function parseCSV(text) {
+  const result = [];
+  let row = [];
+  let value = "";
+  let quoted = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const next = text[i + 1];
+
+    if (char === '"' && quoted && next === '"') {
+      value += '"';
+      i++;
+      continue;
+    }
+
+    if (char === '"') {
+      quoted = !quoted;
+      continue;
+    }
+
+    if (char === "," && !quoted) {
+      row.push(value);
+      value = "";
+      continue;
+    }
+
+    if (
+      (char === "\n" || char === "\r") &&
+      !quoted
+    ) {
+      if (char === "\r" && next === "\n") {
+        i++;
+      }
+
+      row.push(value);
+      result.push(row);
+
+      row = [];
+      value = "";
+      continue;
+    }
+
+    value += char;
+  }
+
+  if (value || row.length) {
+    row.push(value);
+    result.push(row);
+  }
+
+  return result;
+}
+
+function convertCSVToRows(csvText) {
+  const table = parseCSV(csvText);
+
+  if (!table.length) {
+    throw new Error("Excel 沒有資料");
+  }
+
+  const headers = table[0].map(value =>
+    value.replace(/^\uFEFF/, "").trim()
+  );
+
+  const requiredFields = [
+    "宣傳主題",
+    "品牌名稱",
+    "案型",
+    "商品名稱"
+  ];
+
+  const missingFields = requiredFields.filter(
+    field => !headers.includes(field)
+  );
+
+  if (missingFields.length) {
+    throw new Error(
+      "缺少欄位：" +
+      missingFields.join("、")
+    );
+  }
+
+  return table
+    .slice(1)
+    .filter(row =>
+      row.some(value => value.trim() !== "")
+    )
+    .map(row => {
+      const data = {};
+
+      headers.forEach((header, index) => {
+        data[header] =
+          (row[index] || "").trim();
+      });
+
+      return {
+        headline: data["宣傳主題"],
+        brand: data["品牌名稱"],
+        type: data["案型"],
+        product: data["商品名稱"],
+
+        mode: "product",
+        image: null,
+        imageLoaded: false,
+
+        position: {
+          x: 540,
+          y: 680
+        },
+
+        scale: 1
+      };
+    });
+}
+
+function loadExcel(file) {
+  const reader = new FileReader();
+
+  reader.onload = event => {
+    try {
+      const data = new Uint8Array(
+        event.target.result
+      );
+
+      const workbook = XLSX.read(data, {
+        type: "array"
+      });
+
+      const firstSheetName =
+        workbook.SheetNames[0];
+
+      const worksheet =
+        workbook.Sheets[firstSheetName];
+
+      const sheetRows =
+        XLSX.utils.sheet_to_json(
+          worksheet,
+          {
+            header: 1,
+            defval: ""
+          }
+        );
+
+      if (!sheetRows.length) {
+        throw new Error("Excel 沒有資料");
+      }
+
+      const headers = sheetRows[0].map(value =>
+        String(value)
+          .replace(/^\uFEFF/, "")
+          .trim()
+      );
+
+      const requiredFields = [
+        "宣傳主題",
+        "品牌名稱",
+        "案型",
+        "商品名稱"
+      ];
+
+      const missingFields =
+        requiredFields.filter(
+          field => !headers.includes(field)
+        );
+
+      if (missingFields.length) {
+        throw new Error(
+          "缺少欄位：" +
+          missingFields.join("、")
+        );
+      }
+
+      const newRows = sheetRows
+        .slice(1)
+        .filter(row =>
+          row.some(value =>
+            String(value).trim() !== ""
+          )
+        )
+        .map(row => {
+          const data = {};
+
+          headers.forEach((header, index) => {
+            data[header] =
+              String(row[index] || "").trim();
+          });
+
+          return {
+            headline: data["宣傳主題"],
+            brand: data["品牌名稱"],
+            type: data["案型"],
+            product: data["商品名稱"],
+
+            mode: "product",
+            image: null,
+            imageLoaded: false,
+
+            position: {
+              x: 540,
+              y: 680
+            },
+
+            scale: 1
+          };
+        });
+
+      rows.length = 0;
+      rows.push(...newRows);
+
+      renderAll();
+
+      setStatus(
+        `成功讀取 ${rows.length} 筆資料，請逐筆選擇版型並上傳圖片。`
+      );
+    } catch (error) {
+      setStatus("讀取失敗：" + error.message);
+    }
+  };
+
+  reader.readAsArrayBuffer(file);
+}
+
+function drawBackground(ctx, mode) {
+  const background =
+    backgrounds[mode];
+
+  if (
+    background.complete &&
+    background.naturalWidth > 0
+  ) {
+    ctx.drawImage(
+      background,
+      0,
+      0,
+      1080,
+      1350
+    );
+  } else {
+    ctx.fillStyle = "#f34b2e";
+    ctx.fillRect(0, 0, 1080, 1350);
+  }
+}
+
+function drawProductImage(ctx, item) {
+  if (!item.imageLoaded) return;
+
+  const maxSize = 650;
+
+  const ratio =
+    Math.min(
+      maxSize / item.image.width,
+      maxSize / item.image.height
+    ) * item.scale;
+
+  const width = item.image.width * ratio;
+  const height = item.image.height * ratio;
+
+  ctx.save();
+
+  ctx.shadowColor = "#0004";
+  ctx.shadowBlur = 28;
+  ctx.shadowOffsetY = 15;
+
+  ctx.drawImage(
+    item.image,
+    item.position.x - width / 2,
+    item.position.y - height / 2,
+    width,
+    height
+  );
+
+  ctx.restore();
+}
+
+function drawSceneImage(ctx, item) {
+  if (!item.imageLoaded) return;
+
+  const box = {
+    x: 290,
+    y: 425,
+    width: 500,
+    height: 500
+  };
+
+  const ratio =
+    Math.max(
+      box.width / item.image.width,
+      box.height / item.image.height
+    ) * item.scale;
+
+  const width = item.image.width * ratio;
+  const height = item.image.height * ratio;
+
+  ctx.save();
+
+  ctx.beginPath();
+  ctx.rect(
+    box.x,
+    box.y,
+    box.width,
+    box.height
+  );
+
+  ctx.clip();
+
+  ctx.drawImage(
+    item.image,
+    item.position.x - width / 2,
+    item.position.y - height / 2,
+    width,
+    height
+  );
+
+  ctx.restore();
+}
+
+function drawTexts(ctx, item) {
+  ctx.textAlign = "center";
+
+  ctx.fillStyle = "#3d3d3d";
+  ctx.font = `800 58px ${FONT}`;
+  ctx.fillText(
+    item.headline,
+    540,
+    168
+  );
+
+  ctx.fillStyle = "#ce3634";
+  ctx.font = `800 70px ${FONT}`;
+  ctx.fillText(
+    item.brand,
+    540,
+    258
+  );
+
+  ctx.fillStyle = "#080808";
+  ctx.font = `700 46px ${FONT}`;
+  ctx.fillText(
+    item.type,
+    540,
+    330
+  );
+
+  ctx.fillStyle = "#777";
+  ctx.font = `800 48px ${FONT}`;
+  ctx.fillText(
+    item.product,
+    540,
+    1065
+  );
+
+  ctx.textAlign = "start";
+}
+
+function renderCanvas(item, canvas) {
+  const ctx = canvas.getContext("2d");
+
+  ctx.clearRect(
+    0,
+    0,
+    1080,
+    1350
+  );
+
+  drawBackground(ctx, item.mode);
+
+  if (item.mode === "scene") {
+    drawSceneImage(ctx, item);
+  } else {
+    drawProductImage(ctx, item);
+  }
+
+  drawTexts(ctx, item);
+}
+
+function escapeHTML(value) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function createCard(item, index) {
+  const card = document.createElement("article");
+
+  card.className = "item";
+
+  card.innerHTML = `
+    <div class="item-head">
+      <span class="item-number">
+        第 ${index + 1} 筆
+      </span>
+      <span>${escapeHTML(item.type)}</span>
+    </div>
+
+    <div class="canvas-wrap">
+      <canvas
+        class="item-canvas"
+        width="1080"
+        height="1350"
+      ></canvas>
+    </div>
+
+    <select class="mode-select">
+      <option value="product">純商品版</option>
+      <option value="scene">情境圖版</option>
+    </select>
+
+    <input
+      class="headline-input"
+      type="text"
+      value="${escapeHTML(item.headline)}"
+      placeholder="宣傳主題"
+    >
+
+    <input
+      class="brand-input"
+      type="text"
+      value="${escapeHTML(item.brand)}"
+      placeholder="品牌名稱"
+    >
+
+    <input
+      class="type-input"
+      type="text"
+      value="${escapeHTML(item.type)}"
+      placeholder="案型"
+    >
+
+    <input
+      class="product-input"
+      type="text"
+      value="${escapeHTML(item.product)}"
+      placeholder="商品名稱"
+    >
+
+    <label class="upload-image">
+      上傳商品／情境圖片
+      <input
+        class="image-input"
+        type="file"
+        accept="image/png,image/jpeg"
+      >
+      <div class="file-name"></div>
+    </label>
+
+    <div class="zoom-area">
+      圖片大小：
+      <span class="zoom-value">100%</span>
+      <input
+        class="zoom-input"
+        type="range"
+        min="50"
+        max="160"
+        value="100"
+      >
+    </div>
+
+    <div class="controls">
+      <button class="download-one">
+        下載 JPG
+      </button>
+
+      <button class="reset-one secondary">
+        重設圖片
+      </button>
+    </div>
+  `;
+
+  const canvas =
+    card.querySelector(".item-canvas");
+
+  const modeSelect =
+    card.querySelector(".mode-select");
+
+  const imageInput =
+    card.querySelector(".image-input");
+
+  const zoomInput =
+    card.querySelector(".zoom-input");
+
+  const zoomValue =
+    card.querySelector(".zoom-value");
+
+  const fileName =
+    card.querySelector(".file-name");
+
+  const headlineInput =
+    card.querySelector(".headline-input");
+
+  const brandInput =
+    card.querySelector(".brand-input");
+
+  const typeInput =
+    card.querySelector(".type-input");
+
+  const productInput =
+    card.querySelector(".product-input");
+
+  const downloadButton =
+    card.querySelector(".download-one");
+
+  const resetButton =
+    card.querySelector(".reset-one");
+
+  modeSelect.value = item.mode;
+
+  function updateText() {
+    item.headline = headlineInput.value;
+    item.brand = brandInput.value;
+    item.type = typeInput.value;
+    item.product = productInput.value;
+
+    renderCanvas(item, canvas);
+  }
+
+  [
+    headlineInput,
+    brandInput,
+    typeInput,
+    productInput
+  ].forEach(input => {
+    input.addEventListener("input", updateText);
+  });
+
+  modeSelect.addEventListener("change", () => {
+    item.mode = modeSelect.value;
+
+    item.position = {
+      x: 540,
+      y: item.mode === "scene"
+        ? 675
+        : 680
+    };
+
+    renderCanvas(item, canvas);
+  });
+
+  zoomInput.addEventListener("input", event => {
+    item.scale =
+      Number(event.target.value) / 100;
+
+    zoomValue.textContent =
+      event.target.value + "%";
+
+    renderCanvas(item, canvas);
+  });
+
+  imageInput.addEventListener("change", event => {
+    const file = event.target.files[0];
+
+    if (!file) return;
+
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+
+    image.onload = () => {
+      item.image = image;
+      item.imageLoaded = true;
+
+      item.position = {
+        x: 540,
+        y: item.mode === "scene"
+          ? 675
+          : 680
+      };
+
+      fileName.textContent = file.name;
+
+      renderCanvas(item, canvas);
+
+      URL.revokeObjectURL(url);
+    };
+
+    image.src = url;
+  });
+
+  let dragging = false;
+  let lastPoint = null;
+
+  function getCanvasPoint(event) {
+    const rect =
+      canvas.getBoundingClientRect();
+
+    return {
+      x:
+        (event.clientX - rect.left) *
+        1080 / rect.width,
+
+      y:
+        (event.clientY - rect.top) *
+        1350 / rect.height
+    };
+  }
+
+  canvas.addEventListener("pointerdown", event => {
+    if (!item.imageLoaded) return;
+
+    dragging = true;
+    lastPoint = getCanvasPoint(event);
+
+    canvas.setPointerCapture(event.pointerId);
+  });
+
+  canvas.addEventListener("pointermove", event => {
+    if (!dragging) return;
+
+    const point = getCanvasPoint(event);
+
+    item.position.x +=
+      point.x - lastPoint.x;
+
+    item.position.y +=
+      point.y - lastPoint.y;
+
+    lastPoint = point;
+
+    renderCanvas(item, canvas);
+  });
+
+  canvas.addEventListener("pointerup", () => {
+    dragging = false;
+  });
+
+  canvas.addEventListener("pointercancel", () => {
+    dragging = false;
+  });
+
+  resetButton.addEventListener("click", () => {
+    item.position = {
+      x: 540,
+      y: item.mode === "scene"
+        ? 675
+        : 680
+    };
+
+    item.scale = 1;
+
+    zoomInput.value = 100;
+    zoomValue.textContent = "100%";
+
+    renderCanvas(item, canvas);
+  });
+
+  downloadButton.addEventListener("click", () => {
+    const link = document.createElement("a");
+
+    link.download =
+      "強品圖片-" +
+      String(index + 1).padStart(2, "0") +
+      ".jpg";
+
+    link.href = canvas.toDataURL(
+      "image/jpeg",
+      0.92
+    );
+
+    link.click();
+  });
+
+  renderCanvas(item, canvas);
+
+  return card;
+}
+
+function renderAll() {
+  $("grid").innerHTML = "";
+
+  if (!rows.length) {
+    $("empty").style.display = "block";
+    return;
+  }
+
+  $("empty").style.display = "none";
+
+  rows.forEach((item, index) => {
+    $("grid").appendChild(
+      createCard(item, index)
+    );
+  });
+}
+
+$("excelFile").addEventListener("change", event => {
+  const file = event.target.files[0];
+
+  if (!file) return;
+
+  setStatus("正在讀取 Excel……");
+  loadExcel(file);
+});
+
+$("clearAll").addEventListener("click", () => {
+  rows.length = 0;
+  renderAll();
+  setStatus("已清除全部資料。");
+});
+
+backgrounds.product.onload = renderAll;
+backgrounds.scene.onload = renderAll;
+
+renderAll();
+</script>
+
+</body>
+</html>
