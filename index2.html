@@ -99,15 +99,6 @@ button {
   margin: 28px auto 60px;
 }
 
-.empty {
-  padding: 70px 20px;
-  border: 1px dashed #d7cbc1;
-  border-radius: 15px;
-  background: #fff;
-  text-align: center;
-  color: #999;
-}
-
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
@@ -249,6 +240,7 @@ select,
     id="excelDropZone"
   >
     拖曳 Excel 到這裡，或點擊上傳
+
     <input
       id="excelFile"
       type="file"
@@ -273,19 +265,10 @@ select,
 </section>
 
 <main class="container">
-
-  <div
-    id="empty"
-    class="empty"
-  >
-    請先拖曳或上傳 Excel 檔案
-  </div>
-
   <div
     id="grid"
     class="grid"
   ></div>
-
 </main>
 
 <script>
@@ -336,8 +319,20 @@ function enableDropZone(zone, callback) {
   });
 }
 
-function loadExcel(file) {
+function processExcelFile(file) {
+  const valid =
+    file.name.endsWith(".xlsx") ||
+    file.name.endsWith(".xls") ||
+    file.name.endsWith(".csv");
+
+  if (!valid) {
+    setStatus("請上傳 .xlsx、.xls 或 .csv 檔案。");
+    return;
+  }
+
   const reader = new FileReader();
+
+  setStatus("正在讀取 Excel……");
 
   reader.onload = event => {
     try {
@@ -441,21 +436,6 @@ function loadExcel(file) {
   };
 
   reader.readAsArrayBuffer(file);
-}
-
-function processExcelFile(file) {
-  const valid =
-    file.name.endsWith(".xlsx") ||
-    file.name.endsWith(".xls") ||
-    file.name.endsWith(".csv");
-
-  if (!valid) {
-    setStatus("請上傳 .xlsx、.xls 或 .csv 檔案。");
-    return;
-  }
-
-  setStatus("正在讀取 Excel……");
-  loadExcel(file);
 }
 
 function drawBackground(ctx, mode) {
@@ -669,7 +649,10 @@ function createCard(item, index) {
       <span class="item-number">
         第 ${index + 1} 筆
       </span>
-      <span>${escapeHTML(item.type)}</span>
+
+      <span>
+        ${escapeHTML(item.type)}
+      </span>
     </div>
 
     <div class="canvas-wrap">
@@ -715,11 +698,13 @@ function createCard(item, index) {
 
     <label class="upload-image">
       拖曳圖片到這裡，或點擊上傳
+
       <input
         class="image-input"
         type="file"
         accept="image/png,image/jpeg"
       >
+
       <div class="file-name"></div>
     </label>
 
@@ -943,11 +928,8 @@ function renderAll() {
   $("grid").innerHTML = "";
 
   if (!rows.length) {
-    $("empty").style.display = "block";
     return;
   }
-
-  $("empty").style.display = "none";
 
   rows.forEach((item, index) => {
     $("grid").appendChild(
@@ -971,14 +953,12 @@ enableDropZone(
 
 $("clearAll").addEventListener("click", () => {
   rows.length = 0;
-  renderAll();
+  $("grid").innerHTML = "";
   setStatus("已清除全部資料。");
 });
 
 backgrounds.product.onload = renderAll;
 backgrounds.scene.onload = renderAll;
-
-renderAll();
 </script>
 
 </body>
