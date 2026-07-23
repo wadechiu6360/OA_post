@@ -50,17 +50,25 @@ header p {
 }
 
 .excel-upload {
-  display: inline-flex;
+  min-width: 230px;
+  min-height: 64px;
+  padding: 12px 20px;
+  border: 1.5px dashed #d7cbc1;
+  border-radius: 10px;
+  background: #fff;
+  color: #444;
+  cursor: pointer;
+  text-align: center;
+  display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 190px;
-  height: 42px;
-  padding: 0 16px;
-  border-radius: 8px;
-  background: #222;
-  color: #fff;
-  cursor: pointer;
-  font-size: 13px;
+  transition: .2s;
+}
+
+.excel-upload:hover,
+.excel-upload.drag-over {
+  border-color: #f04b2f;
+  background: #fff0eb;
 }
 
 .excel-upload input {
@@ -154,14 +162,22 @@ select,
 
 .upload-image {
   display: block;
+  min-height: 64px;
   margin-top: 10px;
   padding: 11px;
-  border: 1px dashed #d7cbc1;
+  border: 1.5px dashed #d7cbc1;
   border-radius: 8px;
   color: #777;
   text-align: center;
   cursor: pointer;
   font-size: 12px;
+  transition: .2s;
+}
+
+.upload-image:hover,
+.upload-image.drag-over {
+  border-color: #f04b2f;
+  background: #fff0eb;
 }
 
 .upload-image input {
@@ -228,8 +244,11 @@ select,
 
 <section class="toolbar">
 
-  <label class="excel-upload">
-    上傳 Excel 檔案
+  <label
+    class="excel-upload"
+    id="excelDropZone"
+  >
+    拖曳 Excel 到這裡，或點擊上傳
     <input
       id="excelFile"
       type="file"
@@ -259,7 +278,7 @@ select,
     id="empty"
     class="empty"
   >
-    請先上傳 Excel 檔案
+    請先拖曳或上傳 Excel 檔案
   </div>
 
   <div
@@ -289,120 +308,32 @@ function setStatus(message) {
   $("status").textContent = message;
 }
 
-function parseCSV(text) {
-  const result = [];
-  let row = [];
-  let value = "";
-  let quoted = false;
+function enableDropZone(zone, callback) {
+  zone.addEventListener("dragenter", event => {
+    event.preventDefault();
+    zone.classList.add("drag-over");
+  });
 
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i];
-    const next = text[i + 1];
+  zone.addEventListener("dragover", event => {
+    event.preventDefault();
+    zone.classList.add("drag-over");
+  });
 
-    if (char === '"' && quoted && next === '"') {
-      value += '"';
-      i++;
-      continue;
+  zone.addEventListener("dragleave", event => {
+    event.preventDefault();
+    zone.classList.remove("drag-over");
+  });
+
+  zone.addEventListener("drop", event => {
+    event.preventDefault();
+    zone.classList.remove("drag-over");
+
+    const file = event.dataTransfer.files[0];
+
+    if (file) {
+      callback(file);
     }
-
-    if (char === '"') {
-      quoted = !quoted;
-      continue;
-    }
-
-    if (char === "," && !quoted) {
-      row.push(value);
-      value = "";
-      continue;
-    }
-
-    if (
-      (char === "\n" || char === "\r") &&
-      !quoted
-    ) {
-      if (char === "\r" && next === "\n") {
-        i++;
-      }
-
-      row.push(value);
-      result.push(row);
-
-      row = [];
-      value = "";
-      continue;
-    }
-
-    value += char;
-  }
-
-  if (value || row.length) {
-    row.push(value);
-    result.push(row);
-  }
-
-  return result;
-}
-
-function convertCSVToRows(csvText) {
-  const table = parseCSV(csvText);
-
-  if (!table.length) {
-    throw new Error("Excel 沒有資料");
-  }
-
-  const headers = table[0].map(value =>
-    value.replace(/^\uFEFF/, "").trim()
-  );
-
-  const requiredFields = [
-    "宣傳主題",
-    "品牌名稱",
-    "案型",
-    "商品名稱"
-  ];
-
-  const missingFields = requiredFields.filter(
-    field => !headers.includes(field)
-  );
-
-  if (missingFields.length) {
-    throw new Error(
-      "缺少欄位：" +
-      missingFields.join("、")
-    );
-  }
-
-  return table
-    .slice(1)
-    .filter(row =>
-      row.some(value => value.trim() !== "")
-    )
-    .map(row => {
-      const data = {};
-
-      headers.forEach((header, index) => {
-        data[header] =
-          (row[index] || "").trim();
-      });
-
-      return {
-        headline: data["宣傳主題"],
-        brand: data["品牌名稱"],
-        type: data["案型"],
-        product: data["商品名稱"],
-
-        mode: "product",
-        image: null,
-        imageLoaded: false,
-
-        position: {
-          x: 540,
-          y: 680
-        },
-
-        scale: 1
-      };
-    });
+  });
 }
 
 function loadExcel(file) {
@@ -418,13 +349,13 @@ function loadExcel(file) {
         type: "array"
       });
 
-      const firstSheetName =
+      const sheetName =
         workbook.SheetNames[0];
 
       const worksheet =
-        workbook.Sheets[firstSheetName];
+        workbook.Sheets[sheetName];
 
-      const sheetRows =
+      const table =
         XLSX.utils.sheet_to_json(
           worksheet,
           {
@@ -433,11 +364,11 @@ function loadExcel(file) {
           }
         );
 
-      if (!sheetRows.length) {
+      if (!table.length) {
         throw new Error("Excel 沒有資料");
       }
 
-      const headers = sheetRows[0].map(value =>
+      const headers = table[0].map(value =>
         String(value)
           .replace(/^\uFEFF/, "")
           .trim()
@@ -462,7 +393,7 @@ function loadExcel(file) {
         );
       }
 
-      const newRows = sheetRows
+      const newRows = table
         .slice(1)
         .filter(row =>
           row.some(value =>
@@ -510,6 +441,21 @@ function loadExcel(file) {
   };
 
   reader.readAsArrayBuffer(file);
+}
+
+function processExcelFile(file) {
+  const valid =
+    file.name.endsWith(".xlsx") ||
+    file.name.endsWith(".xls") ||
+    file.name.endsWith(".csv");
+
+  if (!valid) {
+    setStatus("請上傳 .xlsx、.xls 或 .csv 檔案。");
+    return;
+  }
+
+  setStatus("正在讀取 Excel……");
+  loadExcel(file);
 }
 
 function drawBackground(ctx, mode) {
@@ -586,6 +532,7 @@ function drawSceneImage(ctx, item) {
   ctx.save();
 
   ctx.beginPath();
+
   ctx.rect(
     box.x,
     box.y,
@@ -674,6 +621,44 @@ function escapeHTML(value) {
     .replaceAll("'", "&#039;");
 }
 
+function handleImageFile(
+  file,
+  item,
+  canvas,
+  fileName
+) {
+  if (
+    !file.type.includes("image/png") &&
+    !file.type.includes("image/jpeg")
+  ) {
+    alert("請上傳 PNG 或 JPG 圖片");
+    return;
+  }
+
+  const url = URL.createObjectURL(file);
+  const image = new Image();
+
+  image.onload = () => {
+    item.image = image;
+    item.imageLoaded = true;
+
+    item.position = {
+      x: 540,
+      y: item.mode === "scene"
+        ? 675
+        : 680
+    };
+
+    fileName.textContent = file.name;
+
+    renderCanvas(item, canvas);
+
+    URL.revokeObjectURL(url);
+  };
+
+  image.src = url;
+}
+
 function createCard(item, index) {
   const card = document.createElement("article");
 
@@ -729,7 +714,7 @@ function createCard(item, index) {
     >
 
     <label class="upload-image">
-      上傳商品／情境圖片
+      拖曳圖片到這裡，或點擊上傳
       <input
         class="image-input"
         type="file"
@@ -741,6 +726,7 @@ function createCard(item, index) {
     <div class="zoom-area">
       圖片大小：
       <span class="zoom-value">100%</span>
+
       <input
         class="zoom-input"
         type="range"
@@ -766,6 +752,9 @@ function createCard(item, index) {
 
   const modeSelect =
     card.querySelector(".mode-select");
+
+  const uploadZone =
+    card.querySelector(".upload-image");
 
   const imageInput =
     card.querySelector(".image-input");
@@ -830,6 +819,28 @@ function createCard(item, index) {
     renderCanvas(item, canvas);
   });
 
+  imageInput.addEventListener("change", event => {
+    const file = event.target.files[0];
+
+    if (file) {
+      handleImageFile(
+        file,
+        item,
+        canvas,
+        fileName
+      );
+    }
+  });
+
+  enableDropZone(uploadZone, file => {
+    handleImageFile(
+      file,
+      item,
+      canvas,
+      fileName
+    );
+  });
+
   zoomInput.addEventListener("input", event => {
     item.scale =
       Number(event.target.value) / 100;
@@ -838,35 +849,6 @@ function createCard(item, index) {
       event.target.value + "%";
 
     renderCanvas(item, canvas);
-  });
-
-  imageInput.addEventListener("change", event => {
-    const file = event.target.files[0];
-
-    if (!file) return;
-
-    const url = URL.createObjectURL(file);
-    const image = new Image();
-
-    image.onload = () => {
-      item.image = image;
-      item.imageLoaded = true;
-
-      item.position = {
-        x: 540,
-        y: item.mode === "scene"
-          ? 675
-          : 680
-      };
-
-      fileName.textContent = file.name;
-
-      renderCanvas(item, canvas);
-
-      URL.revokeObjectURL(url);
-    };
-
-    image.src = url;
   });
 
   let dragging = false;
@@ -977,11 +959,15 @@ function renderAll() {
 $("excelFile").addEventListener("change", event => {
   const file = event.target.files[0];
 
-  if (!file) return;
-
-  setStatus("正在讀取 Excel……");
-  loadExcel(file);
+  if (file) {
+    processExcelFile(file);
+  }
 });
+
+enableDropZone(
+  $("excelDropZone"),
+  processExcelFile
+);
 
 $("clearAll").addEventListener("click", () => {
   rows.length = 0;
